@@ -479,7 +479,7 @@ test "using the actual AST generator for a simple number as the root expression"
         },
 
         else => {
-            try std.testing.expect(false); // logically ambitious for the example given
+            try std.testing.expect(false);
         },
     }
 }
