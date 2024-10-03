@@ -326,122 +326,97 @@ pub const ASTGenerator = struct {
     }
 };
 
+pub fn tokenizeString(str_in: []const u8, allocator: Allocator) !Tokenizer {
+    var tokenizer_to_return = Tokenizer.init(allocator);
+    tokenizer_to_return.input_text = str_in;
+    try tokenizer_to_return.tokenizeFromCurrentPosition();
+
+    return tokenizer_to_return;
+}
+
 test "using the tokenizer to tokenize equal signs and stars" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
+    var tokens = try tokenizeString("*=", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "*=";
-    try tokenizer.tokenizeFromCurrentPosition();
-
-    try std.testing.expectEqual(true, tokenizer.token_result.items[0].token_type == TokenType.star);
-    try std.testing.expectEqual(true, tokenizer.token_result.getLast().token_type == TokenType.equal_sign);
-    try std.testing.expectEqual('=', tokenizer.token_result.getLast().token_body[0]);
-
-    tokenizer.deinit();
+    try std.testing.expectEqual(true, tokens.token_result.items[0].token_type == TokenType.star);
+    try std.testing.expectEqual(true, tokens.token_result.getLast().token_type == TokenType.equal_sign);
+    try std.testing.expectEqual('=', tokens.token_result.getLast().token_body[0]);
 }
 
 test "testing tokenizer outputs with all available symbols" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("+/*=-", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "+/*=-";
-    try tokenizer.tokenizeFromCurrentPosition();
-
-    try std.testing.expectEqual(tokenizer.token_result.items.len, 5);
-    try std.testing.expectEqual(tokenizer.token_result.items[0].token_type, TokenType.plus);
-    try std.testing.expectEqual(tokenizer.token_result.items[1].token_type, TokenType.slash);
-    try std.testing.expectEqual(tokenizer.token_result.items[2].token_type, TokenType.star);
-    try std.testing.expectEqual(tokenizer.token_result.items[3].token_type, TokenType.equal_sign);
-    try std.testing.expectEqual(tokenizer.token_result.items[4].token_type, TokenType.minus);
+    try std.testing.expectEqual(tokens.token_result.items.len, 5);
+    try std.testing.expectEqual(tokens.token_result.items[0].token_type, TokenType.plus);
+    try std.testing.expectEqual(tokens.token_result.items[1].token_type, TokenType.slash);
+    try std.testing.expectEqual(tokens.token_result.items[2].token_type, TokenType.star);
+    try std.testing.expectEqual(tokens.token_result.items[3].token_type, TokenType.equal_sign);
+    try std.testing.expectEqual(tokens.token_result.items[4].token_type, TokenType.minus);
 }
 
 test "tokenizing identifiers simple" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("ab+cd", std.testing.allocator);
+    defer tokens.deinit();
 
-    //                      vv vv -> separate tokens - 'ab' and 'cd'
-    tokenizer.input_text = "ab+cd";
-    try tokenizer.tokenizeFromCurrentPosition();
+    try std.testing.expectEqual(tokens.token_result.items[0].token_type, TokenType.identifier);
+    try std.testing.expectEqual(tokens.token_result.items[1].token_type, TokenType.plus);
+    try std.testing.expectEqual(tokens.token_result.items[2].token_type, TokenType.identifier);
 
-    try std.testing.expectEqual(tokenizer.token_result.items[0].token_type, TokenType.identifier);
-    try std.testing.expectEqual(tokenizer.token_result.items[1].token_type, TokenType.plus);
-    try std.testing.expectEqual(tokenizer.token_result.items[2].token_type, TokenType.identifier);
-
-    try std.testing.expectEqual(std.mem.eql(u8, tokenizer.token_result.items[0].token_body, "ab"), true);
-    try std.testing.expectEqual(std.mem.eql(u8, tokenizer.token_result.items[1].token_body, "+"), true);
-    try std.testing.expectEqual(std.mem.eql(u8, tokenizer.token_result.items[2].token_body, "cd"), true);
+    try std.testing.expectEqual(std.mem.eql(u8, tokens.token_result.items[0].token_body, "ab"), true);
+    try std.testing.expectEqual(std.mem.eql(u8, tokens.token_result.items[1].token_body, "+"), true);
+    try std.testing.expectEqual(std.mem.eql(u8, tokens.token_result.items[2].token_body, "cd"), true);
 }
 
 test "tokenizing more complex numbers" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("0xAF", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "0xAF";
-
-    try tokenizer.tokenizeFromCurrentPosition();
-    try std.testing.expectEqual(1, tokenizer.token_result.items.len);
-    try std.testing.expectEqual(true, std.mem.eql(u8, tokenizer.token_result.items[0].token_body, "0xAF"));
+    try std.testing.expectEqual(1, tokens.token_result.items.len);
+    try std.testing.expectEqual(true, std.mem.eql(u8, tokens.token_result.items[0].token_body, "0xAF"));
 }
 
 test "tokenizing a simple program and checking its results" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("[section 331]\na = 1\nb = 3\nc = funip1\n\n", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "[section 331]\na = 1\nb = 3\nc = funip1\n\n";
-
-    try tokenizer.tokenizeFromCurrentPosition();
-    try std.testing.expectEqual(14, tokenizer.token_result.items.len);
-    try std.testing.expectEqual(TokenType.left_bracket, tokenizer.token_result.items[0].token_type);
-    try std.testing.expectEqual(TokenType.identifier, tokenizer.token_result.items[1].token_type);
-    try std.testing.expectEqual(TokenType.number, tokenizer.token_result.items[2].token_type);
-    try std.testing.expectEqual(TokenType.section_break, tokenizer.token_result.items[tokenizer.token_result.items.len - 1].token_type);
+    try std.testing.expectEqual(14, tokens.token_result.items.len);
+    try std.testing.expectEqual(TokenType.left_bracket, tokens.token_result.items[0].token_type);
+    try std.testing.expectEqual(TokenType.identifier, tokens.token_result.items[1].token_type);
+    try std.testing.expectEqual(TokenType.number, tokens.token_result.items[2].token_type);
+    try std.testing.expectEqual(TokenType.section_break, tokens.token_result.items[tokens.token_result.items.len - 1].token_type);
 }
 
 test "unpredictable inputs should yield similar results" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("                        []", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "                        []";
+    try std.testing.expectEqual(TokenType.left_bracket, tokens.token_result.items[0].token_type);
+    try std.testing.expectEqual(TokenType.right_bracket, tokens.token_result.items[1].token_type);
 
-    try tokenizer.tokenizeFromCurrentPosition();
-    try std.testing.expectEqual(TokenType.left_bracket, tokenizer.token_result.items[0].token_type);
-    try std.testing.expectEqual(TokenType.right_bracket, tokenizer.token_result.items[1].token_type);
+    tokens.current_position = 0;
+    tokens.token_result.clearRetainingCapacity();
 
-    tokenizer.current_position = 0;
-    tokenizer.token_result.clearRetainingCapacity();
+    tokens.input_text = "                        [                                    ]";
 
-    tokenizer.input_text = "                        [                                    ]";
-
-    try tokenizer.tokenizeFromCurrentPosition();
-    try std.testing.expectEqual(TokenType.left_bracket, tokenizer.token_result.items[0].token_type);
-    try std.testing.expectEqual(TokenType.right_bracket, tokenizer.token_result.items[1].token_type);
-
-    tokenizer.current_position = 0;
-    tokenizer.token_result.clearRetainingCapacity();
-
-    tokenizer.input_text = "        [] ]] ";
-
-    try tokenizer.tokenizeFromCurrentPosition();
-    try std.testing.expectEqual(TokenType.left_bracket, tokenizer.token_result.items[0].token_type);
-    try std.testing.expectEqual(TokenType.right_bracket, tokenizer.token_result.items[1].token_type);
+    try tokens.tokenizeFromCurrentPosition();
+    try std.testing.expectEqual(TokenType.left_bracket, tokens.token_result.items[0].token_type);
+    try std.testing.expectEqual(TokenType.right_bracket, tokens.token_result.items[1].token_type);
 }
 
 test "weird inputs should cause soft errors" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer testing_arena_allocator.deinit();
+    const testing_arena = testing_arena_allocator.allocator();
 
-    tokenizer.input_text = " ?{}";
-
-    try std.testing.expectError(error.UnexpectedToken, tokenizer.tokenizeFromCurrentPosition());
+    try std.testing.expectError(error.UnexpectedToken, tokenizeString(" ?{}", testing_arena));
 }
 
 test "comments should be ignored entirely" {
-    var tokenizer = Tokenizer.init(std.testing.allocator);
-    defer tokenizer.deinit();
+    var tokens = try tokenizeString("; ?{}?\na", std.testing.allocator);
+    defer tokens.deinit();
 
-    tokenizer.input_text = "; ?{}?\na";
-    try tokenizer.tokenizeFromCurrentPosition();
-
-    try std.testing.expectEqual(1, tokenizer.token_result.items.len);
+    try std.testing.expectEqual(1, tokens.token_result.items.len);
 }
 
 test "for using the ast generator to generate values from tokens" {
