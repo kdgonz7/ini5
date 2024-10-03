@@ -5,8 +5,6 @@
 //! applicable examples.
 //!
 
-// TODO: modify all `@panic` into TokenizerError
-
 const std = @import("std");
 const ascii = std.ascii;
 
