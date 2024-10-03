@@ -5,6 +5,9 @@
 //! applicable examples.
 //!
 
+// Copyright (C) Kai D. Gonzalez, 2024
+// Licensed under BSD-2C. See LICENSE for details.
+
 const std = @import("std");
 const ascii = std.ascii;
 
