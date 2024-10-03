@@ -581,5 +581,6 @@ test "in patching the rough spots" {
     const testing_arena = testing_arena_allocator.allocator();
 
     var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
+
     try std.testing.expectError(error.UnclosedSection, ast_generator.generateRootNode());
 }
