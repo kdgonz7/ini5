@@ -25,7 +25,7 @@ pub const Value = union(ValueType) {
     number: i64,
     string: []const u8,
     generic_value: []const u8,
-    nil: bool,
+    nil,
 };
 
 pub const Site = struct {
@@ -75,6 +75,16 @@ pub const ParserError = error{
 
 pub const ASTError = error{
     ASTConversionError,
+};
+
+pub const SectionError = error{
+    VariableNotFound,
+};
+
+pub const SectionConversionError = error{
+    OutOfMemory,
+    ValueCanNotBeSectionized,
+    ValueCanNotBeAssignmentized, // TODO: Fix readability of this error
 };
 
 pub const Tokenizer = struct {
@@ -381,6 +391,110 @@ pub const ASTGenerator = struct {
         };
     }
 };
+
+pub const INIValue = Value;
+pub const INIValueType = ValueType;
+pub const INISections = std.ArrayList(INISection);
+pub const INISection = struct {
+    variables: std.StringHashMap(INIValue),
+
+    pub fn init(allocator: Allocator) INISection {
+        return INISection{
+            .variables = std.StringHashMap(INIValue).init(allocator),
+        };
+    }
+
+    pub fn declareVariableAndSetNil(self: *INISection, name: []const u8) !void {
+        try self.variables.put(name, INIValue{.nil});
+    }
+
+    pub fn setVariable(self: *INISection, name: []const u8, value: INIValue) !void {
+        try self.variables.put(name, value);
+    }
+
+    pub fn hasVariable(self: *const INISection, name: []const u8) bool {
+        return self.variables.get(name) != null;
+    }
+
+    pub fn extractValue(self: *const INISection, name: []const u8) SectionError!INIValue {
+        if (self.variables.get(name)) |variable| {
+            return variable;
+        } else {
+            return error.VariableNotFound;
+        }
+    }
+
+    pub fn repr(_: *INISection) []const u8 {}
+
+    pub fn deinit(self: *INISection) void {
+        self.variables.deinit();
+    }
+};
+
+pub fn convertASTIntoSections(allocator: Allocator, node: ASTNode) SectionConversionError!INISections {
+    var return_list = std.ArrayList(INISection).init(allocator);
+
+    switch (node) {
+        ASTNodeType.root_node => |*root| {
+            for (root.children.items) |child| {
+                try return_list.append(try convertSectionFromChild(allocator, child));
+            }
+        },
+        else => {
+            return error.ValueCanNotBeSectionized;
+        },
+    }
+
+    return return_list;
+}
+
+pub fn convertSectionFromChild(allocator: Allocator, child: ASTNode) !INISection {
+    switch (child) {
+        ASTNodeType.section => |sec| {
+            var sect = INISection.init(allocator);
+
+            for (sec.children.items) |assignment| {
+                const unwrapped = try convertAssignment(assignment);
+                try sect.setVariable(unwrapped.lhs, unwrapped.rhs);
+            }
+
+            return sect;
+        },
+
+        else => {
+            return error.ValueCanNotBeSectionized;
+        },
+    }
+}
+
+pub fn convertAssignment(node: ASTNode) !ASTNodeAssignment {
+    switch (node) {
+        ASTNodeType.assignment => |assignment| {
+            return assignment;
+        },
+
+        else => {
+            return error.ValueCanNotBeAssignmentized;
+        },
+    }
+}
+
+pub fn parseConfigurationString(allocator: Allocator, str: []const u8) !INISections {
+    var tokenizer = Tokenizer.init(allocator);
+    var ast_generator = ASTGenerator.init(allocator, &tokenizer.token_result);
+    defer tokenizer.deinit();
+
+    tokenizer.input_text = str;
+    tokenizer.current_position = 0;
+
+    try tokenizer.tokenizeFromCurrentPosition();
+
+    const ast = try ast_generator.generateAbstractSyntaxTree();
+
+    return convertASTIntoSections(allocator, ast);
+}
+
+// Tests
 
 fn tokenizeString(str_in: []const u8, allocator: Allocator) !Tokenizer {
     var tokenizer_to_return = Tokenizer.init(allocator);
@@ -700,4 +814,53 @@ test "strings not getting in the way of other data types" {
     try std.testing.expectEqual(1, root_node.children.items.len);
     try std.testing.expectEqual(2, root_node.children.items[0].section.children.items.len);
     try std.testing.expectEqualStrings(root_node.children.items[0].section.children.items[0].assignment.rhs.string, "\"cool people all over the world\"");
+}
+
+test "ini section objects" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var section1 = INISection.init(testing_arena);
+    try section1.setVariable("hello", INIValue{ .number = 50 });
+
+    try std.testing.expect(section1.hasVariable("hello"));
+    try std.testing.expectEqual(@as(i64, 50), (try section1.extractValue("hello")).number);
+}
+
+test "converting an existing syntax tree into sections" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var tokenizer = Tokenizer.init(testing_arena);
+    tokenizer.input_text = "[Main]\ncool = \"cool people all over the world\"\na = 25";
+
+    try tokenizer.tokenizeFromCurrentPosition();
+
+    var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
+    const ast = try ast_generator.generateAbstractSyntaxTree();
+
+    // this is one of the only differences, now we have a K-V mapping of
+    // identifiers into values.
+    const sections = try convertASTIntoSections(testing_arena, ast);
+
+    try std.testing.expectEqual(1, sections.items.len);
+    try std.testing.expectEqual(true, sections.items[0].hasVariable("cool"));
+    try std.testing.expectEqual(true, sections.items[0].hasVariable("a"));
+}
+
+test "using the shorthand for less boilerplate" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    // parseConfigurationString takes care of the heavy loads,
+    // lexing, parsing, generating the AST, and generating the sections. Those
+    // are all of the steps to parse the config format.
+    var sections = try parseConfigurationString(testing_arena, "[Main]\ncool = \"cool people all over the world\"\na = 25");
+
+    try std.testing.expectEqual(1, sections.items.len);
+    try std.testing.expectEqual(true, sections.items[0].hasVariable("cool"));
+    try std.testing.expectEqual(true, sections.items[0].hasVariable("a"));
 }
