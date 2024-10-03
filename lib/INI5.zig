@@ -37,12 +37,16 @@ pub const TokenType = enum {
     equal_sign,
     left_bracket,
     right_bracket,
+
     star,
     plus,
     minus,
     slash,
+
     identifier,
     number,
+    string,
+
     section_break,
 };
 
@@ -99,6 +103,7 @@ pub const Tokenizer = struct {
         while (self.current_position < self.input_text.len) {
             switch (self.input_text[self.current_position]) {
                 'A'...'Z', 'a'...'z' => try self.tokenizeCurrentIdentifier(),
+                '"' => try self.tokenizeLiteral(),
                 '0'...'9' => try self.tokenizeCurrentNumber(),
                 ';' => try self.ignoreSingleLineComment(),
                 '\n' => try self.tokenizeBreak(),
@@ -162,6 +167,29 @@ pub const Tokenizer = struct {
         });
 
         self.current_position -= 1;
+    }
+
+    pub fn tokenizeLiteral(self: *Tokenizer) !void {
+        const start = self.current_position;
+
+        self.current_position += 1;
+
+        while (self.current_position < self.input_text.len and self.input_text[self.current_position] != '"') {
+            self.current_position += 1;
+
+            if (self.current_position < self.input_text.len) {
+                if (self.input_text[self.current_position] == '\\') {
+                    self.current_position += 1;
+                }
+            }
+        }
+
+        self.current_position += 1;
+
+        try self.token_result.append(Token{
+            .token_body = self.input_text[start..self.current_position],
+            .token_type = TokenType.string,
+        });
     }
 
     pub fn tokenizeBreak(self: *Tokenizer) !void {
@@ -318,7 +346,10 @@ pub const ASTGenerator = struct {
                     break;
                 },
 
-                TokenType.identifier => {},
+                TokenType.identifier,
+                TokenType.number,
+                TokenType.string,
+                => {},
 
                 else => {
                     return error.UnexpectedToken;
@@ -335,9 +366,15 @@ pub const ASTGenerator = struct {
             TokenType.identifier => Value{
                 .generic_value = token.token_body,
             },
+
             TokenType.number => Value{
                 .number = try std.fmt.parseInt(i64, token.token_body, 0),
             },
+
+            TokenType.string => Value{
+                .string = token.token_body,
+            },
+
             else => {
                 return error.UnexpectedValue;
             },
@@ -616,4 +653,51 @@ test "in patching the rough spots" {
     var ast_generator = ASTGenerator.init(testing_allocator, &tokenizer.token_result);
 
     try std.testing.expectError(error.UnclosedSection, ast_generator.generateAbstractSyntaxTree());
+}
+
+test "other kinds of values" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var tokenizer = Tokenizer.init(testing_arena);
+    tokenizer.input_text = "[Main]\nhello = world\ncool = \"cool people all over the world\"";
+
+    try tokenizer.tokenizeFromCurrentPosition();
+
+    var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
+    var ast = try ast_generator.generateAbstractSyntaxTree();
+    const root_node = try ast.rootNode();
+
+    const Main: ASTNodeSection = root_node.children.items[0].section;
+
+    try std.testing.expect(std.mem.eql(u8, Main.section_name, "Main"));
+    try std.testing.expectEqual(2, Main.children.items.len);
+
+    const hello = Main.children.items[0].assignment;
+    try std.testing.expectEqualStrings(hello.lhs, "hello");
+    try std.testing.expectEqualStrings(hello.rhs.generic_value, "world");
+
+    const cool = Main.children.items[1].assignment;
+    try std.testing.expectEqualStrings(cool.lhs, "cool");
+    try std.testing.expectEqualStrings(cool.rhs.string, "\"cool people all over the world\"");
+}
+
+test "strings not getting in the way of other data types" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var tokenizer = Tokenizer.init(testing_arena);
+    tokenizer.input_text = "[Main]\ncool = \"cool people all over the world\"\na = 25";
+
+    try tokenizer.tokenizeFromCurrentPosition();
+
+    var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
+    var ast = try ast_generator.generateAbstractSyntaxTree();
+    const root_node = try ast.rootNode();
+
+    try std.testing.expectEqual(1, root_node.children.items.len);
+    try std.testing.expectEqual(2, root_node.children.items[0].section.children.items.len);
+    try std.testing.expectEqualStrings(root_node.children.items[0].section.children.items[0].assignment.rhs.string, "\"cool people all over the world\"");
 }
