@@ -69,6 +69,10 @@ pub const ParserError = error{
     AssignmentMissingTokens,
 };
 
+pub const ASTError = error{
+    ASTConversionError,
+};
+
 pub const Tokenizer = struct {
     input_text: []const u8,
     current_position: usize,
@@ -206,6 +210,17 @@ pub const ASTNode = union(ASTNodeType) {
     section: ASTNodeSection,
     root_node: ASTNodeRoot,
     value: Value,
+
+    pub fn rootNode(self: *ASTNode) ASTError!ASTNodeRoot {
+        switch (self.*) {
+            .root_node => |_| {
+                return self.root_node;
+            },
+            else => {
+                return error.ASTConversionError;
+            },
+        }
+    }
 };
 
 pub const ASTGenerator = struct {
@@ -221,8 +236,8 @@ pub const ASTGenerator = struct {
         };
     }
 
-    pub fn generateRootNode(self: *ASTGenerator) !ASTNode {
-        var root = ASTNode{
+    pub fn generateAbstractSyntaxTree(self: *ASTGenerator) !ASTNode {
+        var initial_node = ASTNode{
             .root_node = ASTNodeRoot{
                 .children = ArrayList(ASTNode).init(self.allocator),
             },
@@ -233,13 +248,13 @@ pub const ASTGenerator = struct {
 
             switch (current_token.token_type) {
                 TokenType.left_bracket => {
-                    try root.root_node.children.append(try self.generateSection());
+                    try initial_node.root_node.children.append(try self.generateSection());
                 },
                 TokenType.equal_sign => {
-                    try root.root_node.children.append(try self.generateAssignment());
+                    try initial_node.root_node.children.append(try self.generateAssignment());
                 },
                 TokenType.number => {
-                    try root.root_node.children.append(ASTNode{
+                    try initial_node.root_node.children.append(ASTNode{
                         .value = try self.turnTokenIntoValue(&current_token),
                     });
                 },
@@ -249,7 +264,7 @@ pub const ASTGenerator = struct {
             self.current_token_position += 1;
         }
 
-        return root;
+        return initial_node;
     }
 
     pub fn generateAssignment(self: *ASTGenerator) !ASTNode {
@@ -449,7 +464,7 @@ test "using the actual AST generator for a simple number as the root expression"
     const testing_arena = testing_arena_allocator.allocator();
     var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
 
-    const root = try ast_generator.generateRootNode();
+    const root = try ast_generator.generateAbstractSyntaxTree();
     const value = root.root_node.children.items[0];
 
     switch (value) {
@@ -476,8 +491,8 @@ test "using the AST generator for a simple assignment" {
 
     var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
 
-    const root = try ast_generator.generateRootNode();
-    const first_node = root.root_node.children.items[0];
+    var ast = try ast_generator.generateAbstractSyntaxTree();
+    const first_node = (try ast.rootNode()).children.items[0];
 
     switch (first_node) {
         ASTNodeType.assignment => |assignment| {
@@ -502,9 +517,9 @@ test "multiple statements should also work" {
     const testing_arena = testing_arena_allocator.allocator();
 
     var ast_generator = ASTGenerator.init(testing_arena, &tokenizer.token_result);
-    const root = try ast_generator.generateRootNode();
+    const ast = try ast_generator.generateAbstractSyntaxTree();
 
-    switch (root) {
+    switch (ast) {
         ASTNodeType.root_node => |node| {
             // TODO: find a better way to check these people's types.
 
@@ -535,9 +550,10 @@ test "creating AST sections" {
     try tokenizer.tokenizeFromCurrentPosition();
 
     var ast_generator = ASTGenerator.init(testing_allocator, &tokenizer.token_result);
-    const root = try ast_generator.generateRootNode();
+    var ast = try ast_generator.generateAbstractSyntaxTree();
+    const root = try ast.rootNode();
 
-    const sector_abc: ASTNodeSection = root.root_node.children.items[0].section;
+    const sector_abc: ASTNodeSection = root.children.items[0].section;
 
     try std.testing.expectEqual(true, std.mem.eql(u8, "abc", sector_abc.section_name));
     try std.testing.expectEqual(2, sector_abc.children.items.len);
@@ -556,11 +572,13 @@ test "creating multiple AST Sections, they should all have some data in them" {
     try tokenizer.tokenizeFromCurrentPosition();
 
     var ast_generator = ASTGenerator.init(testing_allocator, &tokenizer.token_result);
-    const root = try ast_generator.generateRootNode();
 
-    try std.testing.expectEqual(2, root.root_node.children.items.len);
+    var ast = try ast_generator.generateAbstractSyntaxTree();
+    const root = try ast.rootNode();
 
-    const sector_abc: ASTNodeSection = root.root_node.children.items[0].section;
+    try std.testing.expectEqual(2, root.children.items.len);
+
+    const sector_abc: ASTNodeSection = root.children.items[0].section;
 
     try std.testing.expectEqual(2, sector_abc.children.items.len);
     try std.testing.expectEqual(true, std.mem.eql(u8, "abc", sector_abc.section_name));
@@ -569,7 +587,7 @@ test "creating multiple AST Sections, they should all have some data in them" {
     try std.testing.expectEqual(true, std.mem.eql(u8, sector_abc.children.items[1].assignment.lhs, "b"));
     try std.testing.expectEqual(5, sector_abc.children.items[1].assignment.rhs.number);
 
-    const sector_def: ASTNodeSection = root.root_node.children.items[1].section;
+    const sector_def: ASTNodeSection = root.children.items[1].section;
 
     try std.testing.expectEqual(2, sector_def.children.items.len);
     try std.testing.expectEqual(true, std.mem.eql(u8, "def", sector_def.section_name));
@@ -597,5 +615,5 @@ test "in patching the rough spots" {
 
     var ast_generator = ASTGenerator.init(testing_allocator, &tokenizer.token_result);
 
-    try std.testing.expectError(error.UnclosedSection, ast_generator.generateRootNode());
+    try std.testing.expectError(error.UnclosedSection, ast_generator.generateAbstractSyntaxTree());
 }
