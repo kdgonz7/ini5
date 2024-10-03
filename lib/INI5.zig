@@ -65,6 +65,7 @@ pub const ParserError = error{
 
     UnclosedSection,
     SectionExpectsName,
+    AssignmentMissingTokens,
 };
 
 pub const Tokenizer = struct {
@@ -251,7 +252,9 @@ pub const ASTGenerator = struct {
     }
 
     pub fn generateAssignment(self: *ASTGenerator) !ASTNode {
-        // TODO: add checks to prevent syntax issues here
+        if (self.current_token_position == 0 or self.current_token_position >= self.tokens.items.len or self.current_token_position + 1 >= self.tokens.items.len) {
+            return error.AssignmentMissingTokens;
+        }
         const last_token = self.tokens.items[self.current_token_position - 1];
 
         const node = ASTNode{
