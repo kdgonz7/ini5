@@ -330,7 +330,7 @@ pub const ASTGenerator = struct {
     }
 };
 
-pub fn tokenizeString(str_in: []const u8, allocator: Allocator) !Tokenizer {
+fn tokenizeString(str_in: []const u8, allocator: Allocator) !Tokenizer {
     var tokenizer_to_return = Tokenizer.init(allocator);
     tokenizer_to_return.input_text = str_in;
     try tokenizer_to_return.tokenizeFromCurrentPosition();
