@@ -18,6 +18,7 @@ pub const ValueType = enum {
     number,
     string,
     generic_value,
+    boolean,
     nil,
 };
 
@@ -25,6 +26,7 @@ pub const Value = union(ValueType) {
     number: i64,
     string: []const u8,
     generic_value: []const u8,
+    boolean: bool,
     nil,
 };
 
@@ -373,8 +375,16 @@ pub const ASTGenerator = struct {
 
     pub fn turnTokenIntoValue(_: *ASTGenerator, token: *Token) ParserError!Value {
         return switch (token.token_type) {
-            TokenType.identifier => Value{
-                .generic_value = token.token_body,
+            TokenType.identifier => {
+                if (std.mem.eql(u8, token.token_body, "yes") or std.mem.eql(u8, token.token_body, "no")) {
+                    return Value{
+                        .boolean = std.mem.eql(u8, token.token_body, "yes"),
+                    };
+                } else {
+                    return Value{
+                        .generic_value = token.token_body,
+                    };
+                }
             },
 
             TokenType.number => Value{
@@ -883,4 +893,15 @@ test "using the shorthand for less boilerplate" {
 
     try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("cool"));
     try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("a"));
+}
+
+test "boolean values" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var sections = try parseConfigurationString(testing_arena, "[Main]\ncool = yes");
+
+    try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("cool"));
+    try std.testing.expectEqual(true, (try sections.get("Main").?.extractValue("cool")).boolean);
 }
