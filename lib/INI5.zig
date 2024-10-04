@@ -354,7 +354,6 @@ pub const ASTGenerator = struct {
     }
 
     pub fn generateSection(self: *ASTGenerator) ParserError!ASTNode {
-        // TODO: add checks here
         self.current_token_position += 1;
 
         if (self.current_token_position >= self.tokens.items.len) {
