@@ -22,7 +22,15 @@ pub fn visitSection(name: []const u8, section: INISection, indent: usize) void {
 }
 
 pub fn main() !void {
-    var c_alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+    var GeneralPurposeAllocator = std.heap.GeneralPurposeAllocator(.{
+        .enable_memory_limit = true,
+        .thread_safe = true,
+        .safety = true,
+    }){};
+
+    const gpa = GeneralPurposeAllocator.allocator();
+
+    var c_alloc = std.heap.ArenaAllocator.init(gpa);
     defer c_alloc.deinit();
 
     const arena = c_alloc.allocator();
