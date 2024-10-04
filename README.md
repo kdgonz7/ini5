@@ -13,7 +13,8 @@ the INI5 library.
 * Battle-Tested
     * INI5 is tested against the most random, unpredictable, and corrupted files, and survived each input
         with low memory consumption and efficient error communication. Don't believe me? Try it for yourself!
-        Build the `inivisitor` program, and run it against `samples/overtly_corrupted_file.ini`
+        Build the `inivisitor` program, and run it against `samples/overtly_corrupted_file.ini`. Not even the
+        standing man codepoint can penetrate INI5.
 * Easy-to-read codebase
     * Another goal of INI5 is to be easy to read for people reading the codebase with no experience in either
         Parsing or in the Zig language.
