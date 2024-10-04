@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) !void {
         .target = target_options,
         .optimize = optimize_options,
         .root_source_file = b.path("lib/INIVisitor.zig"),
-        .link_libc = true,
+        .link_libc = false,
     });
 
     var inivisitor_install_artifact = b.addInstallArtifact(ini5_visitor, .{
