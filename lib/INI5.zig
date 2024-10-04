@@ -86,7 +86,7 @@ pub const SectionError = error{
 pub const SectionConversionError = error{
     OutOfMemory,
     ValueCanNotBeSectionized,
-    ValueCanNotBeAssignmentized, // TODO: Fix readability of this error
+    ExpectedAssignment,
 };
 
 pub const Tokenizer = struct {
@@ -496,7 +496,7 @@ pub fn convertAssignment(node: ASTNode) !ASTNodeAssignment {
         },
 
         else => {
-            return error.ValueCanNotBeAssignmentized;
+            return error.ExpectedAssignment;
         },
     }
 }
