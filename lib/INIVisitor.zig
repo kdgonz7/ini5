@@ -36,7 +36,7 @@ pub fn main() !void {
 
     const sections = parseFile(arena, args[1]) catch |err| {
         std.log.err("Failed to read file: '{s}'", .{args[1]});
-        std.log.err("code::({any})", .{err});
+        std.log.err("({any})", .{err});
         std.process.exit(1);
     };
     var section_list = sections.iterator();
