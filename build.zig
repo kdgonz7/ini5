@@ -26,7 +26,10 @@ pub fn build(b: *std.Build) !void {
 
     const test_step = b.step("tests", "Run unit tests for INI5. They should all be passing.");
     const build_step = b.step("visitor", "Build the Ini visitor program (to print INI section results)");
-
+    const all_step = b.step("all", "Builds everything, visitor and tests first.");
     test_step.dependOn(&ini5_tests_artifact.step);
     build_step.dependOn(&inivisitor_install_artifact.step);
+
+    all_step.dependOn(&ini5_tests.step);
+    all_step.dependOn(&ini5_visitor.step);
 }
