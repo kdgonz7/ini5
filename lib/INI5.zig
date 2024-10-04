@@ -235,8 +235,8 @@ pub const Tokenizer = struct {
                         self.comment_char,
                     });
 
-                    if (self.input_text.len > 3) {
-                        std.log.warn("near: {s}...", .{self.input_text[self.current_position - 1 .. self.current_position + 2]});
+                    if (self.input_text.len > 5) {
+                        std.log.warn("near: {s}...", .{self.input_text[self.current_position - 1 .. self.current_position + 5]});
                     }
                 }
             }
