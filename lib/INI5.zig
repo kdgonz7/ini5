@@ -203,7 +203,7 @@ pub const Tokenizer = struct {
     }
 
     pub fn tokenizeBreak(self: *Tokenizer) !void {
-        if (self.input_text[self.current_position - 1] == '\n') {
+        if (self.current_position < self.input_text.len and self.input_text[self.current_position - 1] == '\n') {
             try self.token_result.append(Token{
                 .token_body = "\n",
                 .token_type = TokenType.section_break,
@@ -212,7 +212,7 @@ pub const Tokenizer = struct {
     }
 
     pub fn ignoreSingleLineComment(self: *Tokenizer) !void {
-        while (self.input_text[self.current_position] != '\n') {
+        while (self.current_position < self.input_text.len and self.input_text[self.current_position] != '\n') {
             self.current_position += 1;
         }
     }
