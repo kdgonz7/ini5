@@ -89,11 +89,21 @@ pub const SectionConversionError = error{
     ExpectedAssignment,
 };
 
+pub const TokenizerSettings = struct {
+    warn_about_different_comment_tokens: bool = true,
+
+    pub fn defaultSettings() TokenizerSettings {
+        return TokenizerSettings{};
+    }
+};
+
 pub const Tokenizer = struct {
     input_text: []const u8,
     current_position: usize,
     token_result: ArrayList(Token),
     allocator: Allocator,
+    settings: TokenizerSettings = TokenizerSettings.defaultSettings(),
+    comment_char: ?u8 = null,
 
     pub fn init(allocator: Allocator) Tokenizer {
         return Tokenizer{
@@ -214,6 +224,24 @@ pub const Tokenizer = struct {
     }
 
     pub fn ignoreSingleLineComment(self: *Tokenizer) !void {
+        if (self.settings.warn_about_different_comment_tokens) {
+            if (self.comment_char == null) {
+                self.comment_char = self.input_text[self.current_position];
+            } else {
+                if (self.input_text[self.current_position] != self.comment_char) {
+                    std.log.warn("({d}) different comment character '{?c}' when '{?c}' was expected to begin with.", .{
+                        self.current_position,
+                        self.input_text[self.current_position],
+                        self.comment_char,
+                    });
+
+                    if (self.input_text.len > 3) {
+                        std.log.warn("near: {s}...", .{self.input_text[self.current_position - 1 ..]});
+                    }
+                }
+            }
+        }
+
         while (self.current_position < self.input_text.len and self.input_text[self.current_position] != '\n') {
             self.current_position += 1;
         }
