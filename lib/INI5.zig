@@ -106,7 +106,7 @@ pub const Tokenizer = struct {
 
     /// `A-Z`, `a-z`, `0-9`
     pub fn matchesIdentifierRules(_: *Tokenizer, char: u8) bool {
-        return ascii.isAlphanumeric(char);
+        return ascii.isAlphanumeric(char) or char == '.' or char == '_' or char == '-';
     }
 
     pub fn tokenizeFromCurrentPosition(self: *Tokenizer) TokenizerError!void {
