@@ -117,7 +117,7 @@ pub const Tokenizer = struct {
                 'A'...'Z', 'a'...'z' => try self.tokenizeCurrentIdentifier(),
                 '"' => try self.tokenizeLiteral(),
                 '0'...'9' => try self.tokenizeCurrentNumber(),
-                ';' => try self.ignoreSingleLineComment(),
+                ';', '#' => try self.ignoreSingleLineComment(),
                 '\n' => try self.tokenizeBreak(),
                 '=' => try self.tokenizeCurrentCharacter(TokenType.equal_sign),
                 '[' => try self.tokenizeCurrentCharacter(TokenType.left_bracket),
