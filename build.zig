@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("lib/INI5.zig"),
     });
 
-    const test_step = b.step("test", "Run unit tests for INI5. They should all be passing.");
+    const test_step = b.step("tests", "Run unit tests for INI5. They should all be passing.");
     test_step.dependOn(&b.addRunArtifact(ini5_tests).step);
 
     const build_step = b.step("visitor", "Build the Ini visitor program (to print INI section results)");
