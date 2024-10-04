@@ -5,29 +5,34 @@ shall be provided soon. Converts INI into AST format, supports sections, section
 breaks, and simple assignments and values.
 
 ```zig
-// from 'creating multiple AST Sections, they should all have some data in them'
-var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
-defer testing_arena_allocator.deinit();
+var c_alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+defer c_alloc.deinit();
 
-const testing_allocator = testing_arena_allocator.allocator();
+const arena = c_alloc.allocator();
 
-var tokenizer = Tokenizer.init(testing_allocator);
+const sections = parseFile(arena, "hello.ini") catch |err| {
+    std.log.err("Failed to read file: '{s}'", .{args[1]});
+    std.log.err("({any})", .{err});
+    std.process.exit(1);
+};
 
-tokenizer.input_text = "[abc]\na = 5\nb = 5\n\n[def]\nc=6\nd=7\n";
+var section_list = sections.iterator();
 
-try tokenizer.tokenizeFromCurrentPosition();
+while (section_list.next()) |item| {
+    visit(item.key_ptr.*, item.value_ptr.*, 0);
+}
 
-var ast_generator = ASTGenerator.init(testing_allocator, &tokenizer.token_result);
-const root = try ast_generator.generateRootNode();
+fn visit(name: []const u8, section: INISection, indent: usize) {
+    for (0..indent) |_| {
+        std.log.info(" ", .{});
+    }
 
-try std.testing.expectEqual(2, root.root_node.children.items.len);
+    std.log.info("section {s}", .{name});
 
-const sector_abc: ASTNodeSection = root.root_node.children.items[0].section;
-
-try std.testing.expectEqual(2, sector_abc.children.items.len);
-try std.testing.expectEqual(true, std.mem.eql(u8, "abc", sector_abc.section_name));
-try std.testing.expectEqual(true, std.mem.eql(u8, sector_abc.children.items[0].assignment.lhs, "a"));
-try std.testing.expectEqual(5, sector_abc.children.items[1].assignment.rhs.number);
-try std.testing.expectEqual(true, std.mem.eql(u8, sector_abc.children.items[1].assignment.lhs, "b"));
-try std.testing.expectEqual(5, sector_abc.children.items[1].assignment.rhs.number);
+    var iterator = section.variables.iterator();
+    while (iterator.next()) |assignment| {
+        std.log.info("   | assignment {s}", .{assignment.key_ptr.*});
+        std.log.info("   | value type {any}", .{assignment.value_ptr.*});
+    }
+}
 ```
