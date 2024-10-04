@@ -394,7 +394,7 @@ pub const ASTGenerator = struct {
 
 pub const INIValue = Value;
 pub const INIValueType = ValueType;
-pub const INISections = std.ArrayList(INISection);
+pub const INISections = std.StringHashMap(INISection);
 pub const INISection = struct {
     variables: std.StringHashMap(INIValue),
 
@@ -432,12 +432,12 @@ pub const INISection = struct {
 };
 
 pub fn convertASTIntoSections(allocator: Allocator, node: ASTNode) SectionConversionError!INISections {
-    var return_list = std.ArrayList(INISection).init(allocator);
+    var return_list = INISections.init(allocator);
 
     switch (node) {
         ASTNodeType.root_node => |*root| {
             for (root.children.items) |child| {
-                try return_list.append(try convertSectionFromChild(allocator, child));
+                try return_list.put(try getSectionName(child), try convertSectionFromChild(allocator, child));
             }
         },
         else => {
@@ -459,6 +459,18 @@ pub fn convertSectionFromChild(allocator: Allocator, child: ASTNode) !INISection
             }
 
             return sect;
+        },
+
+        else => {
+            return error.ValueCanNotBeSectionized;
+        },
+    }
+}
+
+pub fn getSectionName(child: ASTNode) ![]const u8 {
+    switch (child) {
+        ASTNodeType.section => |sec| {
+            return sec.section_name;
         },
 
         else => {
@@ -493,6 +505,16 @@ pub fn parseConfigurationString(allocator: Allocator, str: []const u8) !INISecti
 
     return convertASTIntoSections(allocator, ast);
 }
+
+pub fn parseConfigurationFile(allocator: Allocator, file_name: []const u8) !INISections {
+    const file = try std.fs.cwd().readFileAlloc(allocator, file_name, std.math.maxInt(i64));
+    const sections = parseConfigurationString(allocator, file);
+
+    return sections;
+}
+
+pub const parse = parseConfigurationString;
+pub const parseFile = parseConfigurationFile;
 
 // Tests
 
@@ -845,9 +867,8 @@ test "converting an existing syntax tree into sections" {
     // identifiers into values.
     const sections = try convertASTIntoSections(testing_arena, ast);
 
-    try std.testing.expectEqual(1, sections.items.len);
-    try std.testing.expectEqual(true, sections.items[0].hasVariable("cool"));
-    try std.testing.expectEqual(true, sections.items[0].hasVariable("a"));
+    try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("cool"));
+    try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("a"));
 }
 
 test "using the shorthand for less boilerplate" {
@@ -860,7 +881,6 @@ test "using the shorthand for less boilerplate" {
     // are all of the steps to parse the config format.
     var sections = try parseConfigurationString(testing_arena, "[Main]\ncool = \"cool people all over the world\"\na = 25");
 
-    try std.testing.expectEqual(1, sections.items.len);
-    try std.testing.expectEqual(true, sections.items[0].hasVariable("cool"));
-    try std.testing.expectEqual(true, sections.items[0].hasVariable("a"));
+    try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("cool"));
+    try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("a"));
 }
