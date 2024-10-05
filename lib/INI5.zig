@@ -13,6 +13,7 @@ const ascii = std.ascii;
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const CityHash = std.hash.CityHash64;
 
 pub const ValueType = enum {
     number,
@@ -464,6 +465,51 @@ pub const INISection = struct {
     pub fn repr(_: *INISection) []const u8 {}
 
     pub fn deinit(self: *INISection) void {
+        self.variables.deinit();
+    }
+};
+
+/// cryptographically safer than INISection, but slower.
+/// hashes variable keys between add calls.
+pub const INISectionSafe = struct {
+    variables: std.AutoHashMap(u64, INIValue),
+
+    pub fn init(allocator: Allocator) INISectionSafe {
+        return INISectionSafe{
+            .variables = std.AutoHashMap(u64, INIValue).init(allocator),
+        };
+    }
+
+    pub fn declareVariableAndSetNil(self: *INISectionSafe, name: []const u8) !void {
+        try self.variables.put(name, INIValue{.nil});
+    }
+
+    pub fn getVariable(self: *const INISectionSafe, name: []const u8) ?INIValue {
+        return self.variables.get(CityHash.hash(name));
+    }
+
+    pub fn setVariable(self: *INISectionSafe, name: []const u8, value: INIValue) !void {
+        const hashed_name = CityHash.hash(name);
+        try self.variables.put(hashed_name, value);
+    }
+
+    pub fn hasVariable(self: *const INISectionSafe, name: []const u8) bool {
+        return self.getVariable(name) != null;
+    }
+
+    pub fn extractValue(self: *const INISectionSafe, name: []const u8) SectionError!INIValue {
+        const hashed_name = CityHash.hash(name);
+
+        if (self.variables.get(hashed_name)) |variable| {
+            return variable;
+        } else {
+            return error.VariableNotFound;
+        }
+    }
+
+    pub fn repr(_: *INISectionSafe) []const u8 {}
+
+    pub fn deinit(self: *INISectionSafe) void {
         self.variables.deinit();
     }
 };
@@ -931,4 +977,25 @@ test "boolean values" {
 
     try std.testing.expectEqual(true, sections.get("Main").?.hasVariable("cool"));
     try std.testing.expectEqual(true, (try sections.get("Main").?.extractValue("cool")).boolean);
+}
+
+test "hashing" {
+    const string = "Hello";
+    const buf1 = CityHash.hash(string);
+    const buf2 = CityHash.hash(string);
+
+    try std.testing.expectEqual(buf1, buf2);
+}
+
+test "safe sections" {
+    var testing_arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    const testing_arena = testing_arena_allocator.allocator();
+    defer testing_arena_allocator.deinit();
+
+    var section_1 = INISectionSafe.init(testing_arena);
+    try section_1.setVariable("a", INIValue{
+        .number = 138,
+    });
+
+    try std.testing.expect(section_1.hasVariable("a"));
 }
