@@ -40,22 +40,14 @@ pub const TokenType = enum {
     equal_sign,
     left_bracket,
     right_bracket,
-
     star,
     plus,
     minus,
     slash,
-
     identifier,
     number,
     string,
-
     section_break,
-};
-
-pub const Token = struct {
-    token_body: []const u8,
-    token_type: TokenType,
 };
 
 pub const TokenizerError = error{
@@ -66,11 +58,9 @@ pub const TokenizerError = error{
 pub const ParserError = error{
     Overflow,
     OutOfMemory,
-
     InvalidCharacter,
     UnexpectedValue,
     UnexpectedToken,
-
     UnclosedSection,
     SectionExpectsName,
     AssignmentMissingTokens,
@@ -88,6 +78,11 @@ pub const SectionConversionError = error{
     OutOfMemory,
     ValueCanNotBeSectionized,
     ExpectedAssignment,
+};
+
+pub const Token = struct {
+    token_body: []const u8,
+    token_type: TokenType,
 };
 
 pub const TokenizerSettings = struct {
