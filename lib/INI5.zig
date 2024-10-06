@@ -105,11 +105,12 @@ pub const Tokenizer = struct {
         };
     }
 
-    /// `A-Z`, `a-z`, `0-9`
+    /// `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
     pub fn matchesIdentifierRules(_: *Tokenizer, char: u8) bool {
         return ascii.isAlphanumeric(char) or char == '.' or char == '_' or char == '-';
     }
 
+    /// Tokenizes `input_text` from `current_position` onto end.
     pub fn tokenizeFromCurrentPosition(self: *Tokenizer) TokenizerError!void {
         if (self.input_text.len == 0) return;
 
