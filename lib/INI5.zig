@@ -382,7 +382,7 @@ pub const ASTGenerator = struct {
                     try section_node.section.children.append(try self.generateAssignment());
                 },
 
-                TokenType.section_break => {
+                TokenType.section_break, TokenType.left_bracket => {
                     break;
                 },
 
