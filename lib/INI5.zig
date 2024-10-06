@@ -469,35 +469,34 @@ pub const INISection = struct {
     }
 };
 
-/// cryptographically safer than INISection, but slower.
-/// hashes variable keys between add calls.
-pub const INISectionSafe = struct {
+/// double-hashed INI section
+pub const INISectionDoubleHashed = struct {
     variables: std.AutoHashMap(u64, INIValue),
 
-    pub fn init(allocator: Allocator) INISectionSafe {
-        return INISectionSafe{
+    pub fn init(allocator: Allocator) INISectionDoubleHashed {
+        return INISectionDoubleHashed{
             .variables = std.AutoHashMap(u64, INIValue).init(allocator),
         };
     }
 
-    pub fn declareVariableAndSetNil(self: *INISectionSafe, name: []const u8) !void {
+    pub fn declareVariableAndSetNil(self: *INISectionDoubleHashed, name: []const u8) !void {
         try self.variables.put(name, INIValue{.nil});
     }
 
-    pub fn getVariable(self: *const INISectionSafe, name: []const u8) ?INIValue {
+    pub fn getVariable(self: *const INISectionDoubleHashed, name: []const u8) ?INIValue {
         return self.variables.get(CityHash.hash(name));
     }
 
-    pub fn setVariable(self: *INISectionSafe, name: []const u8, value: INIValue) !void {
+    pub fn setVariable(self: *INISectionDoubleHashed, name: []const u8, value: INIValue) !void {
         const hashed_name = CityHash.hash(name);
         try self.variables.put(hashed_name, value);
     }
 
-    pub fn hasVariable(self: *const INISectionSafe, name: []const u8) bool {
+    pub fn hasVariable(self: *const INISectionDoubleHashed, name: []const u8) bool {
         return self.getVariable(name) != null;
     }
 
-    pub fn extractValue(self: *const INISectionSafe, name: []const u8) SectionError!INIValue {
+    pub fn extractValue(self: *const INISectionDoubleHashed, name: []const u8) SectionError!INIValue {
         const hashed_name = CityHash.hash(name);
 
         if (self.variables.get(hashed_name)) |variable| {
@@ -507,9 +506,9 @@ pub const INISectionSafe = struct {
         }
     }
 
-    pub fn repr(_: *INISectionSafe) []const u8 {}
+    pub fn repr(_: *INISectionDoubleHashed) []const u8 {}
 
-    pub fn deinit(self: *INISectionSafe) void {
+    pub fn deinit(self: *INISectionDoubleHashed) void {
         self.variables.deinit();
     }
 };
@@ -992,7 +991,7 @@ test "safe sections" {
     const testing_arena = testing_arena_allocator.allocator();
     defer testing_arena_allocator.deinit();
 
-    var section_1 = INISectionSafe.init(testing_arena);
+    var section_1 = INISectionDoubleHashed.init(testing_arena);
     try section_1.setVariable("a", INIValue{
         .number = 138,
     });
