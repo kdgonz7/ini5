@@ -462,8 +462,6 @@ pub const INISection = struct {
         }
     }
 
-    pub fn repr(_: *INISection) []const u8 {}
-
     pub fn deinit(self: *INISection) void {
         self.variables.deinit();
     }
@@ -505,8 +503,6 @@ pub const INISectionDoubleHashed = struct {
             return error.VariableNotFound;
         }
     }
-
-    pub fn repr(_: *INISectionDoubleHashed) []const u8 {}
 
     pub fn deinit(self: *INISectionDoubleHashed) void {
         self.variables.deinit();
