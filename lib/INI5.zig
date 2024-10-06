@@ -121,6 +121,7 @@ pub const Tokenizer = struct {
                 '0'...'9' => try self.tokenizeCurrentNumber(),
                 ';', '#' => try self.ignoreSingleLineComment(),
                 '\n' => try self.tokenizeBreak(),
+                // TODO: figure out this token situation
                 '=' => try self.tokenizeCurrentCharacter(TokenType.equal_sign),
                 '[' => try self.tokenizeCurrentCharacter(TokenType.left_bracket),
                 ']' => try self.tokenizeCurrentCharacter(TokenType.right_bracket),
