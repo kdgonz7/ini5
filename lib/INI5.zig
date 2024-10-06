@@ -31,11 +31,6 @@ pub const Value = union(ValueType) {
     nil,
 };
 
-pub const Site = struct {
-    begin: usize,
-    end: usize,
-};
-
 pub const TokenType = enum {
     equal_sign,
     left_bracket,
