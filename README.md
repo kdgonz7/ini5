@@ -1,3 +1,7 @@
+<div align="right">
+<img src="./INI5.png" width=70>
+</div>
+
 # INI5
 
 An INI parser library written in Zig, for Zig. Optimizations and benchmarks
